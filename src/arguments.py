@@ -3,9 +3,9 @@ import jax
 import jax.numpy as np
 import argparse
 import sys
+# pyrefly: ignore [missing-import]
 import numpy as onp
-import matplotlib.pyplot as plt
-from jax.config import config
+from jax import config
 
 # Set numpy printing format
 onp.random.seed(0)

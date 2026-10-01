@@ -1,4 +1,3 @@
-import jax
 import jax.numpy as np
 import numpy as onp
 import os
@@ -24,7 +23,7 @@ def set_params():
     # args.r_beam = 0.02
     # args.power = 50
 
-    args.write_sol_interval = 1000
+    args.write_sol_interval = 10
     # args.m_g = 1.2e-4
 
 

@@ -1,0 +1,12 @@
+jax
+jraph
+numpy
+scipy
+matplotlib
+meshio
+scikit-learn
+orix
+
+# Note: The file src/temperature.py also imports fenics (import fenics as fe)
+# FEniCS is typically installed via conda, not pip:
+# conda install -c conda-forge fenics
