@@ -55,9 +55,9 @@ def force_eta_zero_in_liquid(y):
     '''
     In liquid zone, set all eta to be zero.
     '''
-    T, zeta, eta = unpack_state(y)
+    T, zeta, eta, is_active = unpack_state(y)
     eta = np.where(zeta < 0.5, 0., eta)
-    return np.hstack((T, zeta, eta))
+    return np.hstack((T, zeta, eta, is_active))
 
 
 # @walltime
@@ -118,8 +118,8 @@ def inspect_sol(y, y0):
     T = y[:, 0]
     zeta = y[:, 1]
     change_zeta = np.where(zeta < 0.5, 1, 0)
-    eta0 = np.argmax(y0[:, 2:], axis=1)
-    eta = np.argmax(y[:, 2:], axis=1)
+    eta0 = np.argmax(y0[:, 2:-1], axis=1)
+    eta = np.argmax(y[:, 2:-1], axis=1)
     change_eta = np.where(eta0 == eta, 0, 1)
     change_T = np.where(T >= args.T_melt, 1, 0)
     print(f"percet of zeta in liquid = {np.sum(change_zeta)/len(change_zeta)*100}%")
@@ -174,7 +174,7 @@ def write_info(polycrystal):
 def write_sols_heper(polycrystal, mesh, y, melt):
     T = y[:, 0]
     zeta = y[:, 1]
-    eta = y[:, 2:]
+    eta = y[:, 2:-1]
     eta_max = onp.max(eta, axis=1)
     cell_ori_inds = onp.argmax(eta, axis=1)
     ipf_x = onp.take(polycrystal.unique_oris_rgb[0], cell_ori_inds, axis=0)
@@ -442,14 +442,16 @@ def update_graph():
         Compute grad_energy for T, zeta, eta
         '''
         del globals_
-        sender_T, sender_zeta, sender_eta = unpack_state(senders['state'])
-        receiver_T, receiver_zeta, receiver_eta = unpack_state(receivers['state'])
+        sender_T, sender_zeta, sender_eta, sender_active = unpack_state(senders['state'])
+        receiver_T, receiver_zeta, receiver_eta, receiver_active = unpack_state(receivers['state'])
         ch_len = edges['ch_len']
         anisotropy = edges['anisotropy']
         assert anisotropy.shape == sender_eta.shape
-        grad_energy_T = args.kappa_T * 0.5 * np.sum((sender_T - receiver_T)**2 * ch_len)
-        grad_energy_zeta = args.kappa_p * 0.5 * np.sum((sender_zeta - receiver_zeta)**2 * ch_len)
-        grad_energy_eta = args.kappa_g * 0.5 * np.sum((sender_eta - receiver_eta)**2 * ch_len * anisotropy)
+        
+        edge_active = sender_active * receiver_active
+        grad_energy_T = args.kappa_T * 0.5 * np.sum((sender_T - receiver_T)**2 * ch_len * edge_active)
+        grad_energy_zeta = args.kappa_p * 0.5 * np.sum((sender_zeta - receiver_zeta)**2 * ch_len * edge_active)
+        grad_energy_eta = args.kappa_g * 0.5 * np.sum((sender_eta - receiver_eta)**2 * ch_len * anisotropy * edge_active)
         grad_energy = (grad_energy_zeta + grad_energy_eta) * args.ad_hoc + grad_energy_T
  
         return {'grad_energy': grad_energy}
@@ -460,7 +462,7 @@ def update_graph():
         '''
         del sent_edges, received_edges
 
-        T, zeta, eta = unpack_state(nodes['state'])
+        T, zeta, eta, is_active = unpack_state(nodes['state'])
         assert T.shape == zeta.shape
 
         # phi = 0.5 * (1 - np.tanh(1e2*(T/args.T_melt - 1)))
@@ -505,7 +507,7 @@ def phase_field(graph, polycrystal):
         Also, convection and radiation are considered, which act on all surfaces.
         '''
         power_x, power_y, power_on = ode_params
-        T, zeta, eta = unpack_state(y)
+        T, zeta, eta, is_active = unpack_state(y)
         boundary_face_areas = graph.nodes['boundary_face_areas']
         boundary_face_centroids = graph.nodes['boundary_face_centroids']
 
@@ -590,7 +592,12 @@ def phase_field(graph, polycrystal):
         '''
         update_anisotropy()
         _, _, q = compute_energy(y, t, *ode_params)
-        T, zeta, eta = unpack_state(y)
+        T, zeta, eta, is_active = unpack_state(y)
+        
+        power_x, power_y, power_on = ode_params
+        dist_to_laser = np.sqrt((centroids[:, 0] - power_x)**2 + (centroids[:, 1] - power_y)**2)
+        new_is_active = np.logical_or(is_active[:, 0] > 0.5, dist_to_laser < args.r_beam)
+        is_active_float = new_is_active.astype(float)[:, None]
 
         # If T is too large, L would be too large - solution diverges; Also, T too large is not physical.
         T = np.where(T > 2000., 2000., T)
@@ -608,11 +615,13 @@ def phase_field(graph, polycrystal):
 
         Lg = args.L0 * np.exp(-args.Qg / (T*args.gas_const))
 
-        rhs_p = -Lp * (der_grad[:, 1:2]/volumes + der_local[:, 1:2])
-        rhs_g = -Lg * (der_grad[:, 2:]/volumes + der_local[:, 2:])
-        rhs_T = (-der_grad[:, 0:1] + q)/volumes/(args.rho * args.c_p)
+        rhs_p = -Lp * (der_grad[:, 1:2]/volumes + der_local[:, 1:2]) * is_active_float
+        rhs_g = -Lg * (der_grad[:, 2:-1]/volumes + der_local[:, 2:-1]) * is_active_float
+        rhs_T = (-der_grad[:, 0:1] + q)/volumes/(args.rho * args.c_p) * is_active_float
+        
+        rhs_active = (is_active_float - is_active) / args.dt
 
-        rhs = np.hstack((rhs_T, rhs_p, rhs_g))
+        rhs = np.hstack((rhs_T, rhs_p, rhs_g, rhs_active))
 
         return rhs
 

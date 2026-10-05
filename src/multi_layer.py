@@ -30,8 +30,12 @@ def default_initialization(poly_sim):
     zeta = np.ones(num_nodes)
     eta = np.zeros((num_nodes, args.num_oris))
     eta = eta.at[np.arange(num_nodes), poly_sim.cell_ori_inds].set(1)
-    # shape of state: (num_nodes, 1 + 1 + args.num_oris)
-    y0 = np.hstack((T[:, None], zeta[:, None], eta))
+    
+    # DED specific: Initialize material as inactive (0). 
+    is_active = np.zeros(num_nodes)
+    
+    # shape of state: (num_nodes, 1 + 1 + args.num_oris + 1)
+    y0 = np.hstack((T[:, None], zeta[:, None], eta, is_active[:, None]))
     melt = np.zeros(len(y0), dtype=bool)
     return y0, melt
 

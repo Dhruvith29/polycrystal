@@ -33,8 +33,9 @@ plt.rcParams.update({
 def unpack_state(state):
     T = state[..., 0:1]
     zeta = state[...,  1:2]
-    eta = state[..., 2:]
-    return T, zeta, eta
+    eta = state[..., 2:-1]
+    is_active = state[..., -1:]
+    return T, zeta, eta, is_active
 
 
 def get_unique_ori_colors():

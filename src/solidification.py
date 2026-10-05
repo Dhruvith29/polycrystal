@@ -36,6 +36,7 @@ def solidification_initialization(poly_sim):
     eta = np.zeros((num_nodes, args.num_oris))
     # shape of state: (num_nodes, 1 + 1 + args.num_oris)
     eta = eta.at[np.arange(num_nodes), poly_sim.cell_ori_inds].set(1)
+    # shape of state: (num_nodes, 1 + 1 + args.num_oris)
     y0 = np.hstack((T[:, None], zeta[:, None], eta))
     melt = np.zeros(len(y0), dtype=bool)
     return y0, melt
