@@ -36,8 +36,8 @@ def solidification_initialization(poly_sim):
     eta = np.zeros((num_nodes, args.num_oris))
     # shape of state: (num_nodes, 1 + 1 + args.num_oris)
     eta = eta.at[np.arange(num_nodes), poly_sim.cell_ori_inds].set(1)
-    # shape of state: (num_nodes, 1 + 1 + args.num_oris)
-    y0 = np.hstack((T[:, None], zeta[:, None], eta))
+    is_active = np.ones(num_nodes)
+    y0 = np.hstack((T[:, None], zeta[:, None], eta, is_active[:, None]))
     melt = np.zeros(len(y0), dtype=bool)
     return y0, melt
 
@@ -60,9 +60,9 @@ def overwrite_T(y, centroids, t):
     '''
     We overwrite T if T is prescribed.
     '''
-    T, zeta, eta = unpack_state(y) 
+    T, zeta, eta, is_active = unpack_state(y) 
     T = get_T(centroids, t)
-    return np.hstack((T, zeta, eta))
+    return np.hstack((T, zeta, eta, is_active))
 
 
 def run():
