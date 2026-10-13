@@ -17,11 +17,9 @@ def set_params():
     args.domain_width = 0.2
     args.domain_height = 0.1
     
-    args.r_beam = 0.03
-    args.power = 80
+    args.r_beam = 0.04
+    args.power = 70
 
-    # args.r_beam = 0.02
-    # args.power = 50
 
     args.write_sol_interval = 10
     # args.m_g = 1.2e-4
